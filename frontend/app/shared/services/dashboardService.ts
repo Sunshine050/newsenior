@@ -62,7 +62,7 @@ export const fetchDashboardStats = async (): Promise<DashboardStats> => {
 // Functions ใหม่สำหรับ endpoints อื่น ๆ (ปรับ type ให้ match DTO)
 export const fetchActiveEmergencies = async (): Promise<EmergencyCaseDto[]> => {
   const headers = getAuthHeaders();
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/dashboard/active-emergencies`, {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/sos/dashboard/active-emergencies`, {
     headers,
   });
   if (!response.ok) throw new Error(`Failed to fetch active emergencies: ${response.statusText}`);

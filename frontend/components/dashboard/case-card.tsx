@@ -183,7 +183,7 @@ export default function CaseCard({
           if (!token) throw new Error("No access token");
 
           const emergenciesRes = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/dashboard/active-emergencies`,
+            `${process.env.NEXT_PUBLIC_API_URL}/sos/dashboard/active-emergencies`,
             {
               headers: { Authorization: `Bearer ${token}` },
             }

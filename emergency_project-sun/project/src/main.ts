@@ -21,6 +21,9 @@ async function bootstrap() {
   app.useLogger(['log', 'error', 'warn', 'debug', 'verbose']);
   const configService = app.get(ConfigService);
 
+  // Set global prefix for all routes
+  app.setGlobalPrefix('api');
+
   app.use(cookieParser());
 
   app.useGlobalPipes(
@@ -101,7 +104,7 @@ async function bootstrap() {
   // ❌ ไม่เขียนไฟล์ swagger.json ที่นี่ (ป้องกัน loop ใน dev)
   // หากต้องการ export ให้ใช้ export-swagger.ts
 
-  SwaggerModule.setup('api', app, document, {
+  SwaggerModule.setup('api-docs', app, document, {
     customSiteTitle: 'Emergency Project API Documentation',
     customCss: '.swagger-ui .topbar { display: none }',
     swaggerOptions: {
@@ -116,7 +119,7 @@ async function bootstrap() {
   await app.listen(port);
 
   console.log(`🚀 Application is running on: http://localhost:${port}`);
-  console.log(`📘 Swagger UI is available at: http://localhost:${port}/api`);
+  console.log(`📘 Swagger UI is available at: http://localhost:${port}/api-docs`);
   console.log(`🌐 CORS configured for: ${clientUrl}`);
 }
 bootstrap();

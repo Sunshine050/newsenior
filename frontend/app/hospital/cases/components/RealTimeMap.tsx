@@ -46,9 +46,11 @@ const getGradeLabel = (severity: number): string => {
 // ==============================
 // 🎯 Custom Marker
 // ==============================
-const createCustomIcon = (severity: number, isSelected: boolean = false) => {
+const createCustomIcon = (severity: number, isSelected: boolean = false, caseId?: string) => {
   const color = getSeverityColor(severity);
-  const size = isSelected ? 24 : 16;
+  const size = isSelected ? 32 : 24;
+  const borderWidth = isSelected ? 3 : 2;
+  const pulse = isSelected ? 'animate-pulse' : '';
   
   return L.divIcon({
     className: "custom-marker-circle",
@@ -57,11 +59,50 @@ const createCustomIcon = (severity: number, isSelected: boolean = false) => {
         width: ${size}px; 
         height: ${size}px; 
         background-color: ${color}; 
-        border: 2px solid white; 
+        border: ${borderWidth}px solid white; 
         border-radius: 50%; 
-        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.4), 0 0 0 ${isSelected ? '4px' : '0px'} ${color}40;
         transition: all 0.3s ease;
-      "></div>
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      ">
+        ${severity >= 3 ? `
+          <div style="
+            position: absolute;
+            width: ${size + 8}px;
+            height: ${size + 8}px;
+            border: 2px solid ${color};
+            border-radius: 50%;
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+          "></div>
+        ` : ''}
+        <div style="
+          width: ${size - 8}px;
+          height: ${size - 8}px;
+          background-color: white;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: bold;
+          font-size: ${size < 20 ? '8px' : '10px'};
+          color: ${color};
+        ">${severity}</div>
+      </div>
+      <style>
+        @keyframes pulse-ring {
+          0% {
+            transform: scale(0.8);
+            opacity: 1;
+          }
+          100% {
+            transform: scale(1.4);
+            opacity: 0;
+          }
+        }
+      </style>
     `,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
@@ -72,15 +113,23 @@ const createCustomIcon = (severity: number, isSelected: boolean = false) => {
 // 🧩 Popup Content
 // ==============================
 const CasePopup = ({ emergencyCase, onTransferCase }: { emergencyCase: EmergencyCase, onTransferCase?: (id: string) => void }) => {
+  const severityColor = getSeverityColor(emergencyCase.severity);
+  const gradeLabel = getGradeLabel(emergencyCase.severity);
+  
   return (
-    <div className="w-[300px] font-sans">
+    <div className="w-[320px] font-sans">
       {/* Header */}
-      <div className="bg-slate-900 text-white px-4 py-3 flex justify-between items-center rounded-t-lg">
+      <div className="text-white px-4 py-3 flex justify-between items-center rounded-t-lg" style={{ backgroundColor: severityColor }}>
         <div className="flex items-center gap-2">
-          <div className={cn("w-2.5 h-2.5 rounded-full animate-pulse", emergencyCase.severity >= 3 ? "bg-red-500" : "bg-green-500")} />
-          <span className="text-sm font-bold tracking-wide uppercase">{emergencyCase.emergencyType}</span>
+          <div className={cn("w-2.5 h-2.5 rounded-full animate-pulse", emergencyCase.severity >= 3 ? "bg-white" : "bg-white/80")} />
+          <span className="text-sm font-bold tracking-wide uppercase">{emergencyCase.emergencyType || 'Emergency'}</span>
         </div>
-        <span className="text-xs text-slate-400 font-mono">#{emergencyCase.id.slice(0, 4)}</span>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-[10px] px-1.5 py-0">
+            {gradeLabel}
+          </Badge>
+          <span className="text-xs font-mono bg-white/20 px-2 py-0.5 rounded">#{emergencyCase.id.slice(0, 6)}</span>
+        </div>
       </div>
 
       {/* Body */}
@@ -141,8 +190,23 @@ const CasePopup = ({ emergencyCase, onTransferCase }: { emergencyCase: Emergency
           )}
         </div>
 
+        {/* Status Badge */}
+        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-2">
+            <Badge 
+              variant={emergencyCase.status === 'assigned' ? 'default' : emergencyCase.status === 'in-progress' ? 'secondary' : 'outline'}
+              className="text-[10px]"
+            >
+              {emergencyCase.status.toUpperCase()}
+            </Badge>
+            <span className="text-xs text-slate-400">
+              Severity: {emergencyCase.severity}/4
+            </span>
+          </div>
+        </div>
+
         {/* Actions */}
-        <div className="pt-1 flex gap-2">
+        <div className="pt-2 flex gap-2">
           <Button
             size="sm"
             variant="outline"
@@ -268,17 +332,35 @@ export function RealTimeMap({
 
     cases.forEach((emergencyCase) => {
       const isSelected = emergencyCase.id === selectedCaseId;
-      const icon = createCustomIcon(emergencyCase.severity, isSelected);
+      const icon = createCustomIcon(emergencyCase.severity, isSelected, emergencyCase.id);
 
       const marker = L.marker(
         [emergencyCase.location.coordinates.lat, emergencyCase.location.coordinates.lng],
-        { icon }
+        { 
+          icon,
+          title: `${emergencyCase.patientName} - ${emergencyCase.emergencyType}`,
+          riseOnHover: true,
+        }
       ).addTo(map);
 
+      // Click handler
       marker.on('click', () => {
         onCaseSelect?.(emergencyCase.id);
+        marker.openPopup();
       });
 
+      // Hover effects
+      marker.on('mouseover', () => {
+        marker.setIcon(createCustomIcon(emergencyCase.severity, true, emergencyCase.id));
+      });
+
+      marker.on('mouseout', () => {
+        if (!isSelected) {
+          marker.setIcon(createCustomIcon(emergencyCase.severity, false, emergencyCase.id));
+        }
+      });
+
+      // Create popup with React
       const popupNode = document.createElement('div');
       const root = createRoot(popupNode);
       root.render(
@@ -289,14 +371,19 @@ export function RealTimeMap({
       );
       
       marker.bindPopup(popupNode, {
-        maxWidth: 320,
+        maxWidth: 350,
         className: 'custom-popup-clean',
-        closeButton: false,
-        offset: [0, -10]
+        closeButton: true,
+        autoClose: false,
+        closeOnClick: false,
+        offset: [0, -15],
+        autoPan: true,
+        autoPanPadding: [50, 50],
       });
 
       markersRef.current[emergencyCase.id] = marker;
 
+      // Auto open popup for selected case
       if (isSelected) {
         setTimeout(() => {
           marker.openPopup();
@@ -331,6 +418,35 @@ export function RealTimeMap({
 
   return (
     <div className={`relative group isolate ${className}`}>
+      {/* Custom CSS for markers */}
+      <style jsx global>{`
+        .custom-marker-circle {
+          background: transparent !important;
+          border: none !important;
+        }
+        .leaflet-popup-content-wrapper {
+          border-radius: 12px;
+          padding: 0;
+        }
+        .leaflet-popup-content {
+          margin: 0;
+          padding: 0;
+        }
+        .leaflet-popup-tip {
+          background: white;
+        }
+        @keyframes pulse-ring {
+          0% {
+            transform: scale(0.8);
+            opacity: 1;
+          }
+          100% {
+            transform: scale(1.4);
+            opacity: 0;
+          }
+        }
+      `}</style>
+      
       {/* Map Container */}
       <div 
         ref={mapContainerRef} 

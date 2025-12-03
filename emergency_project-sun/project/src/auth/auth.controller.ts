@@ -202,7 +202,7 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('verify-token')
+  @Post('verify-token')
   @ApiOperation({ summary: 'Verify JWT token' })
   @ApiBearerAuth()
   @ApiResponse({ status: 200, description: 'Token is valid' })

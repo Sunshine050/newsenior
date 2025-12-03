@@ -24,7 +24,7 @@ class WebSocketClient {
     console.log('Socket กำลังทำงานอยู่...');
 
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3001';
-    this.socket = io(`${wsUrl}`, {
+    this.socket = io(`${wsUrl}/notifications`, {
       auth: { token },
       transports: ['websocket', 'polling'],
       reconnection: false,
@@ -91,7 +91,8 @@ class WebSocketClient {
 
     try {
       // Use POST method for verify-token as required by backend
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/verify-token`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+      const res = await fetch(`${apiUrl}/auth/verify-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

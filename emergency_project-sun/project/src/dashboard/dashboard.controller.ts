@@ -9,7 +9,7 @@ import { AssignCaseDto, CancelCaseDto } from './dto/dashboard.dto';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth()
-@Controller('rescue/dashboard')
+@Controller('dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN, UserRole.EMERGENCY_CENTER)
 export class DashboardController {

@@ -28,7 +28,7 @@ interface UpdateEmergencyStatusDto {
 /** Fetch active emergencies for the dashboard (returns normalized EmergencyCase[]) */
 export const fetchActiveEmergencies = async (): Promise<EmergencyCase[]> => {
   const headers = getAuthHeaders();
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/dashboard/active-emergencies`, {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/sos/dashboard/active-emergencies`, {
     headers,
   });
   if (!response.ok) {
@@ -82,7 +82,7 @@ export const assignCase = async (caseId: string, hospitalId: string): Promise<an
 /** Fetch reports (currently same endpoint as active emergencies) */
 export const fetchReports = async (): Promise<Report[]> => {
   const headers = getAuthHeaders();
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/dashboard/active-emergencies`, {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/sos/dashboard/active-emergencies`, {
     headers,
   });
   if (!response.ok) {
