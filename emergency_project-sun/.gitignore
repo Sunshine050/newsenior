@@ -1,0 +1,4 @@
+# IDE - VSCode
+# Exclude VSCode settings to prevent accidental exposure of API keys and sensitive configurations
+.vscode/
+
