@@ -18,9 +18,25 @@ const gradeToSeverity: Record<string, number> = {
 export const normalizeCaseData = (item: any): EmergencyCase => {
   const symptomsData = item.medicalInfo?.symptoms;
   const symptoms = Array.isArray(symptomsData) ? symptomsData : symptomsData ? [symptomsData.toString()] : [];
-  const validStatus = ["pending", "assigned", "in-progress", "completed", "cancelled"];
-  const normalizedStatus = item.status ? item.status.toLowerCase() : "pending";
-  const status = validStatus.includes(normalizedStatus) ? normalizedStatus : "pending";
+  
+  // Map backend status (uppercase with underscore) to frontend status (lowercase with dash)
+  const statusMap: Record<string, string> = {
+    "PENDING": "pending",
+    "ASSIGNED": "assigned",
+    "IN_PROGRESS": "in-progress",
+    "COMPLETED": "completed",
+    "CANCELLED": "cancelled",
+    // Also support lowercase versions
+    "pending": "pending",
+    "assigned": "assigned",
+    "in-progress": "in-progress",
+    "in_progress": "in-progress",
+    "completed": "completed",
+    "cancelled": "cancelled",
+  };
+  
+  const rawStatus = item.status || "PENDING";
+  const normalizedStatus = statusMap[rawStatus] || statusMap[rawStatus.toUpperCase()] || "pending";
   let severity = Number(item.medicalInfo?.severity) || gradeToSeverity[item.grade] || 1;
   let grade = (item.medicalInfo?.grade || item.grade || "NON_URGENT").toUpperCase();
   if (grade === "UNKNOWN" || !grade || grade === "") {

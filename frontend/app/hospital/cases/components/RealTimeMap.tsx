@@ -6,18 +6,36 @@ import "leaflet/dist/leaflet.css";
 import { EmergencyCase } from "@/shared/types";
 import { Badge } from "@components/ui/badge";
 import { Button } from "@components/ui/button";
-import { MapPin, Navigation, Phone, User, Clock, Activity, Layers, ShieldAlert, Plus, Minus, Map as MapIcon, Globe } from "lucide-react";
+import {
+  MapPin,
+  Navigation,
+  Phone,
+  User,
+  Clock,
+  Activity,
+  Layers,
+  ShieldAlert,
+  Plus,
+  Minus,
+  Map as MapIcon,
+  Globe,
+  Truck,
+} from "lucide-react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { createRoot } from "react-dom/client";
 import { cn } from "@lib/utils";
+import { getCaseStatusLabel } from "@/shared/utils/statusUtils";
 
 // Fix Leaflet default icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+  iconRetinaUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+  iconUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
 // ==============================
@@ -25,33 +43,47 @@ L.Icon.Default.mergeOptions({
 // ==============================
 const getSeverityColor = (severity: number): string => {
   switch (severity) {
-    case 4: return "#ef4444"; // Red-500
-    case 3: return "#f97316"; // Orange-500
-    case 2: return "#eab308"; // Yellow-500
-    case 1: return "#22c55e"; // Green-500
-    default: return "#94a3b8"; // Slate-400
+    case 4:
+      return "#ef4444"; // Red-500
+    case 3:
+      return "#f97316"; // Orange-500
+    case 2:
+      return "#eab308"; // Yellow-500
+    case 1:
+      return "#22c55e"; // Green-500
+    default:
+      return "#94a3b8"; // Slate-400
   }
 };
 
 const getGradeLabel = (severity: number): string => {
   switch (severity) {
-    case 4: return "Critical";
-    case 3: return "Urgent";
-    case 2: return "Moderate";
-    case 1: return "General";
-    default: return "Unknown";
+    case 4:
+      return "Critical";
+    case 3:
+      return "Urgent";
+    case 2:
+      return "Moderate";
+    case 1:
+      return "General";
+    default:
+      return "Unknown";
   }
 };
 
 // ==============================
 // 🎯 Custom Marker
 // ==============================
-const createCustomIcon = (severity: number, isSelected: boolean = false, caseId?: string) => {
+const createCustomIcon = (
+  severity: number,
+  isSelected: boolean = false,
+  caseId?: string
+) => {
   const color = getSeverityColor(severity);
   const size = isSelected ? 32 : 24;
   const borderWidth = isSelected ? 3 : 2;
-  const pulse = isSelected ? 'animate-pulse' : '';
-  
+  const pulse = isSelected ? "animate-pulse" : "";
+
   return L.divIcon({
     className: "custom-marker-circle",
     html: `
@@ -61,14 +93,18 @@ const createCustomIcon = (severity: number, isSelected: boolean = false, caseId?
         background-color: ${color}; 
         border: ${borderWidth}px solid white; 
         border-radius: 50%; 
-        box-shadow: 0 4px 8px rgba(0,0,0,0.4), 0 0 0 ${isSelected ? '4px' : '0px'} ${color}40;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.4), 0 0 0 ${
+          isSelected ? "4px" : "0px"
+        } ${color}40;
         transition: all 0.3s ease;
         display: flex;
         align-items: center;
         justify-content: center;
         position: relative;
       ">
-        ${severity >= 3 ? `
+        ${
+          severity >= 3
+            ? `
           <div style="
             position: absolute;
             width: ${size + 8}px;
@@ -77,7 +113,9 @@ const createCustomIcon = (severity: number, isSelected: boolean = false, caseId?
             border-radius: 50%;
             animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
           "></div>
-        ` : ''}
+        `
+            : ""
+        }
         <div style="
           width: ${size - 8}px;
           height: ${size - 8}px;
@@ -87,7 +125,7 @@ const createCustomIcon = (severity: number, isSelected: boolean = false, caseId?
           align-items: center;
           justify-content: center;
           font-weight: bold;
-          font-size: ${size < 20 ? '8px' : '10px'};
+          font-size: ${size < 20 ? "8px" : "10px"};
           color: ${color};
         ">${severity}</div>
       </div>
@@ -112,105 +150,174 @@ const createCustomIcon = (severity: number, isSelected: boolean = false, caseId?
 // ==============================
 // 🧩 Popup Content
 // ==============================
-const CasePopup = ({ emergencyCase, onTransferCase }: { emergencyCase: EmergencyCase, onTransferCase?: (id: string) => void }) => {
+const CasePopup = ({
+  emergencyCase,
+  onTransferCase,
+}: {
+  emergencyCase: EmergencyCase;
+  onTransferCase?: (id: string) => void;
+}) => {
   const severityColor = getSeverityColor(emergencyCase.severity);
   const gradeLabel = getGradeLabel(emergencyCase.severity);
-  
+  const timeAgo = format(new Date(emergencyCase.reportedAt), "d MMM HH:mm", {
+    locale: th,
+  });
+
   return (
-    <div className="w-[320px] font-sans">
-      {/* Header */}
-      <div className="text-white px-4 py-3 flex justify-between items-center rounded-t-lg" style={{ backgroundColor: severityColor }}>
-        <div className="flex items-center gap-2">
-          <div className={cn("w-2.5 h-2.5 rounded-full animate-pulse", emergencyCase.severity >= 3 ? "bg-white" : "bg-white/80")} />
-          <span className="text-sm font-bold tracking-wide uppercase">{emergencyCase.emergencyType || 'Emergency'}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-[10px] px-1.5 py-0">
-            {gradeLabel}
-          </Badge>
-          <span className="text-xs font-mono bg-white/20 px-2 py-0.5 rounded">#{emergencyCase.id.slice(0, 6)}</span>
+    <div className="w-[360px] font-sans shadow-xl">
+      {/* Header with gradient */}
+      <div
+        className="text-white px-5 py-4 flex justify-between items-start rounded-t-xl relative overflow-hidden"
+        style={{ backgroundColor: severityColor }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-black/10 to-transparent"></div>
+        <div className="relative z-10 flex-1">
+          <div className="flex items-center gap-2.5 mb-2">
+            <div
+              className={cn(
+                "w-3 h-3 rounded-full animate-pulse shadow-lg",
+                emergencyCase.severity >= 3 ? "bg-white" : "bg-white/90"
+              )}
+            />
+            <span className="text-base font-bold tracking-wide uppercase">
+              {emergencyCase.emergencyType || "Emergency"}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge
+              variant="secondary"
+              className="bg-white/25 text-white border-white/40 text-[11px] px-2 py-0.5 font-semibold backdrop-blur-sm"
+            >
+              {gradeLabel}
+            </Badge>
+            <span className="text-xs font-mono bg-white/20 px-2 py-1 rounded-md backdrop-blur-sm">
+              #{emergencyCase.id.slice(0, 8)}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Body */}
-      <div className="p-4 space-y-4 bg-white rounded-b-lg">
-        {/* Patient & Location */}
-        <div className="space-y-3">
-          <div className="flex items-start gap-3">
-            <div className="bg-slate-100 p-2 rounded-full shrink-0">
-              <User className="h-4 w-4 text-slate-600" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-900 leading-tight">{emergencyCase.patientName}</p>
-              <div className="flex items-center gap-2 mt-1">
-                <Phone className="h-3 w-3 text-slate-400" />
-                <p className="text-xs text-slate-500">{emergencyCase.contactNumber}</p>
-              </div>
-            </div>
+      <div className="p-5 space-y-4 bg-white rounded-b-xl">
+        {/* Patient Information */}
+        <div className="flex items-start gap-3 p-3 bg-gradient-to-r from-slate-50 to-white rounded-lg border border-slate-100">
+          <div className="bg-blue-100 p-2.5 rounded-full shrink-0 shadow-sm">
+            <User className="h-4 w-4 text-blue-600" />
           </div>
-
-          <div className="flex items-start gap-3">
-            <div className="bg-slate-100 p-2 rounded-full shrink-0">
-              <MapPin className="h-4 w-4 text-slate-600" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">{emergencyCase.location.address}</p>
-              <div className="flex items-center gap-2 mt-1">
-                <Clock className="h-3 w-3 text-slate-400" />
-                <span className="text-xs text-slate-400">
-                  {format(new Date(emergencyCase.reportedAt), "d MMM HH:mm", { locale: th })}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Symptoms & Description */}
-        <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 space-y-2">
-          {emergencyCase.symptoms.length > 0 && (
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Symptoms</p>
-              <div className="flex flex-wrap gap-1.5">
-                {emergencyCase.symptoms.map((s, i) => (
-                  <span key={i} className="text-[10px] bg-white border border-slate-200 px-2 py-0.5 rounded-full text-slate-600 font-medium">
-                    {s}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {emergencyCase.description && (
-            <div className="pt-2 border-t border-slate-200/50 mt-2">
-              <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1">Description</p>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                {emergencyCase.description}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-slate-900 leading-tight mb-1">
+              {emergencyCase.patientName}
+            </p>
+            <div className="flex items-center gap-2">
+              <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              <p className="text-xs text-slate-600 truncate">
+                {emergencyCase.contactNumber || "N/A"}
               </p>
             </div>
-          )}
-        </div>
-
-        {/* Status Badge */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-          <div className="flex items-center gap-2">
-            <Badge 
-              variant={emergencyCase.status === 'assigned' ? 'default' : emergencyCase.status === 'in-progress' ? 'secondary' : 'outline'}
-              className="text-[10px]"
-            >
-              {emergencyCase.status.toUpperCase()}
-            </Badge>
-            <span className="text-xs text-slate-400">
-              Severity: {emergencyCase.severity}/4
-            </span>
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Location & Time */}
+        <div className="flex items-start gap-3 p-3 bg-gradient-to-r from-slate-50 to-white rounded-lg border border-slate-100">
+          <div className="bg-green-100 p-2.5 rounded-full shrink-0 shadow-sm">
+            <MapPin className="h-4 w-4 text-green-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-slate-700 leading-relaxed mb-2 line-clamp-2">
+              {emergencyCase.location.address}
+            </p>
+            <div className="flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              <span className="text-xs text-slate-500 font-medium">
+                {timeAgo}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Assigned To (if available) */}
+        {emergencyCase.assignedTo && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg">
+            <Activity className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] uppercase tracking-wider text-blue-600 font-bold mb-0.5">
+                Assigned To
+              </p>
+              <p className="text-xs font-semibold text-blue-900 truncate">
+                {emergencyCase.assignedTo}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Symptoms */}
+        {emergencyCase.symptoms.length > 0 && (
+          <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
+            <p className="text-[10px] uppercase tracking-wider text-amber-700 font-bold mb-2 flex items-center gap-1.5">
+              <ShieldAlert className="h-3 w-3" />
+              Symptoms
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {emergencyCase.symptoms.map((s, i) => (
+                <span
+                  key={i}
+                  className="text-[11px] bg-white border border-amber-200 px-2.5 py-1 rounded-full text-amber-800 font-medium shadow-sm"
+                >
+                  {s}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Description */}
+        {emergencyCase.descriptionFull && (
+          <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-2">
+              Description
+            </p>
+            <p className="text-xs text-slate-700 leading-relaxed line-clamp-3">
+              {emergencyCase.descriptionFull}
+            </p>
+          </div>
+        )}
+
+        {/* Status & Severity Info */}
+        <div className="flex items-center justify-between pt-3 border-t border-slate-200">
+          <div className="flex items-center gap-2">
+            <Badge
+              variant={
+                emergencyCase.status === "assigned"
+                  ? "default"
+                  : emergencyCase.status === "in-progress"
+                  ? "secondary"
+                  : emergencyCase.status === "completed"
+                  ? "outline"
+                  : emergencyCase.status === "cancelled"
+                  ? "destructive"
+                  : "outline"
+              }
+              className="text-[11px] font-semibold px-2.5 py-1"
+            >
+              {getCaseStatusLabel(emergencyCase.status)}
+            </Badge>
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 rounded-md">
+              <span className="text-[10px] text-slate-500 font-medium">
+                Severity
+              </span>
+              <span className="text-xs font-bold text-slate-700">
+                {emergencyCase.severity}/4
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
         <div className="pt-2 flex gap-2">
           <Button
             size="sm"
             variant="outline"
-            className="flex-1 h-9 text-xs border-slate-200 hover:bg-slate-50 hover:text-slate-900"
+            className="flex-1 h-10 text-xs border-slate-300 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 font-medium shadow-sm"
             onClick={() => {
               window.open(
                 `https://www.google.com/maps/dir/?api=1&destination=${emergencyCase.location.coordinates.lat},${emergencyCase.location.coordinates.lng}`,
@@ -218,15 +325,16 @@ const CasePopup = ({ emergencyCase, onTransferCase }: { emergencyCase: Emergency
               );
             }}
           >
-            <Navigation className="h-3.5 w-3.5 mr-1.5" />
+            <Navigation className="h-4 w-4 mr-1.5" />
             Navigate
           </Button>
           {onTransferCase && emergencyCase.status === "assigned" && (
             <Button
               size="sm"
-              className="flex-1 h-9 text-xs bg-slate-900 hover:bg-slate-800 text-white shadow-sm"
+              className="flex-1 h-10 text-xs bg-slate-900 hover:bg-slate-800 text-white shadow-md font-medium"
               onClick={() => onTransferCase(emergencyCase.id)}
             >
+              <Truck className="h-4 w-4 mr-1.5" />
               Assign Team
             </Button>
           )}
@@ -264,7 +372,7 @@ export function RealTimeMap({
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const [mounted, setMounted] = useState(false);
   const [isLegendOpen, setIsLegendOpen] = useState(false);
-  const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('roadmap');
+  const [mapType, setMapType] = useState<"roadmap" | "satellite">("roadmap");
 
   // Initialize Map
   useEffect(() => {
@@ -278,16 +386,17 @@ export function RealTimeMap({
 
     const map = L.map(mapContainerRef.current, {
       zoomControl: false,
-      attributionControl: false
+      attributionControl: false,
     }).setView([13.7563, 100.5018], 12);
 
     mapInstanceRef.current = map;
 
     // Initial Tile Layer
-    const googleRoadmap = 'https://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}';
+    const googleRoadmap =
+      "https://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}";
     const tileLayer = L.tileLayer(googleRoadmap, {
       maxZoom: 20,
-      subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+      subdomains: ["mt0", "mt1", "mt2", "mt3"],
     });
     tileLayer.addTo(map);
     tileLayerRef.current = tileLayer;
@@ -307,19 +416,20 @@ export function RealTimeMap({
       tileLayerRef.current.remove();
     }
 
-    const googleRoadmap = 'https://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}';
-    const googleSatellite = 'https://mt0.google.com/vt/lyrs=s,h&hl=en&x={x}&y={y}&z={z}';
+    const googleRoadmap =
+      "https://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}";
+    const googleSatellite =
+      "https://mt0.google.com/vt/lyrs=s,h&hl=en&x={x}&y={y}&z={z}";
 
-    const url = mapType === 'roadmap' ? googleRoadmap : googleSatellite;
+    const url = mapType === "roadmap" ? googleRoadmap : googleSatellite;
 
     const tileLayer = L.tileLayer(url, {
       maxZoom: 20,
-      subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+      subdomains: ["mt0", "mt1", "mt2", "mt3"],
     });
 
     tileLayer.addTo(map);
     tileLayerRef.current = tileLayer;
-
   }, [mapType, mounted]);
 
   // Handle Markers & Selection
@@ -327,16 +437,23 @@ export function RealTimeMap({
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    Object.values(markersRef.current).forEach(marker => marker.remove());
+    Object.values(markersRef.current).forEach((marker) => marker.remove());
     markersRef.current = {};
 
     cases.forEach((emergencyCase) => {
       const isSelected = emergencyCase.id === selectedCaseId;
-      const icon = createCustomIcon(emergencyCase.severity, isSelected, emergencyCase.id);
+      const icon = createCustomIcon(
+        emergencyCase.severity,
+        isSelected,
+        emergencyCase.id
+      );
 
       const marker = L.marker(
-        [emergencyCase.location.coordinates.lat, emergencyCase.location.coordinates.lng],
-        { 
+        [
+          emergencyCase.location.coordinates.lat,
+          emergencyCase.location.coordinates.lng,
+        ],
+        {
           icon,
           title: `${emergencyCase.patientName} - ${emergencyCase.emergencyType}`,
           riseOnHover: true,
@@ -344,35 +461,39 @@ export function RealTimeMap({
       ).addTo(map);
 
       // Click handler
-      marker.on('click', () => {
+      marker.on("click", () => {
         onCaseSelect?.(emergencyCase.id);
         marker.openPopup();
       });
 
       // Hover effects
-      marker.on('mouseover', () => {
-        marker.setIcon(createCustomIcon(emergencyCase.severity, true, emergencyCase.id));
+      marker.on("mouseover", () => {
+        marker.setIcon(
+          createCustomIcon(emergencyCase.severity, true, emergencyCase.id)
+        );
       });
 
-      marker.on('mouseout', () => {
+      marker.on("mouseout", () => {
         if (!isSelected) {
-          marker.setIcon(createCustomIcon(emergencyCase.severity, false, emergencyCase.id));
+          marker.setIcon(
+            createCustomIcon(emergencyCase.severity, false, emergencyCase.id)
+          );
         }
       });
 
       // Create popup with React
-      const popupNode = document.createElement('div');
+      const popupNode = document.createElement("div");
       const root = createRoot(popupNode);
       root.render(
-        <CasePopup 
-          emergencyCase={emergencyCase} 
-          onTransferCase={onTransferCase} 
+        <CasePopup
+          emergencyCase={emergencyCase}
+          onTransferCase={onTransferCase}
         />
       );
-      
+
       marker.bindPopup(popupNode, {
-        maxWidth: 350,
-        className: 'custom-popup-clean',
+        maxWidth: 380,
+        className: "custom-popup-clean",
         closeButton: true,
         autoClose: false,
         closeOnClick: false,
@@ -388,7 +509,10 @@ export function RealTimeMap({
         setTimeout(() => {
           marker.openPopup();
           map.flyTo(
-            [emergencyCase.location.coordinates.lat, emergencyCase.location.coordinates.lng],
+            [
+              emergencyCase.location.coordinates.lat,
+              emergencyCase.location.coordinates.lng,
+            ],
             16,
             { duration: 1.5, easeLinearity: 0.25 }
           );
@@ -398,16 +522,20 @@ export function RealTimeMap({
 
     if (!selectedCaseId && cases.length > 0) {
       const bounds = L.latLngBounds(
-        cases.map(c => [c.location.coordinates.lat, c.location.coordinates.lng])
+        cases.map((c) => [
+          c.location.coordinates.lat,
+          c.location.coordinates.lng,
+        ])
       );
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
     }
-
   }, [cases, selectedCaseId, onCaseSelect, onTransferCase]);
 
   if (!mounted) {
     return (
-      <div className={`flex items-center justify-center bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 ${className}`}>
+      <div
+        className={`flex items-center justify-center bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 ${className}`}
+      >
         <div className="text-center p-8">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-slate-900 dark:border-white mx-auto mb-4"></div>
           <p className="text-sm font-medium text-slate-500">Loading Map...</p>
@@ -446,13 +574,13 @@ export function RealTimeMap({
           }
         }
       `}</style>
-      
+
       {/* Map Container */}
-      <div 
-        ref={mapContainerRef} 
+      <div
+        ref={mapContainerRef}
         className="h-full w-full rounded-2xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800 z-0 bg-slate-100"
       />
-      
+
       {/* 🟢 Top Floating Bar: Minimalist Stats */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[400]">
         <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-full shadow-lg border border-white/20 ring-1 ring-black/5 flex items-center gap-4 transition-all hover:bg-white dark:hover:bg-slate-900">
@@ -461,18 +589,22 @@ export function RealTimeMap({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
             </span>
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Live</span>
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+              Live
+            </span>
           </div>
           <div className="h-3 w-[1px] bg-slate-200 dark:bg-slate-700"></div>
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-slate-500">Active</span>
-            <span className="text-sm font-bold text-slate-900 dark:text-white">{cases.length}</span>
+            <span className="text-sm font-bold text-slate-900 dark:text-white">
+              {cases.length}
+            </span>
           </div>
           <div className="h-3 w-[1px] bg-slate-200 dark:bg-slate-700"></div>
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-slate-500">Critical</span>
             <span className="text-sm font-bold text-red-600 dark:text-red-400">
-              {cases.filter(c => c.severity >= 3).length}
+              {cases.filter((c) => c.severity >= 3).length}
             </span>
           </div>
         </div>
@@ -480,23 +612,22 @@ export function RealTimeMap({
 
       {/* ↘️ Bottom Right: Custom Controls */}
       <div className="absolute bottom-6 right-4 flex flex-col items-end gap-2 z-[400]">
-        
         {/* Map Type Toggle */}
         <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-1 rounded-lg shadow-lg border border-white/20 ring-1 ring-black/5 flex flex-col gap-1">
           <Button
             size="icon"
-            variant={mapType === 'roadmap' ? 'secondary' : 'ghost'}
+            variant={mapType === "roadmap" ? "secondary" : "ghost"}
             className="h-8 w-8 rounded-md"
-            onClick={() => setMapType('roadmap')}
+            onClick={() => setMapType("roadmap")}
             title="Roadmap"
           >
             <MapIcon className="h-4 w-4" />
           </Button>
           <Button
             size="icon"
-            variant={mapType === 'satellite' ? 'secondary' : 'ghost'}
+            variant={mapType === "satellite" ? "secondary" : "ghost"}
             className="h-8 w-8 rounded-md"
-            onClick={() => setMapType('satellite')}
+            onClick={() => setMapType("satellite")}
             title="Satellite"
           >
             <Globe className="h-4 w-4" />
