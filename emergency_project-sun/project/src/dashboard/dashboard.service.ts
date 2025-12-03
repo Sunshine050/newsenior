@@ -293,9 +293,11 @@ export class DashboardService {
         throw new NotFoundException('Emergency case not found');
       }
 
-      if (emergency.status !== EmergencyStatus.PENDING) {
-        this.logger.warn(`Emergency case ${caseId} is not in PENDING status`);
-        throw new BadRequestException('Emergency case can only be assigned if it is in PENDING status');
+      // อนุญาตให้ assign case ที่มี status เป็น PENDING, ASSIGNED, หรือ IN_PROGRESS
+      // (สำหรับกรณีที่ hospital ต้องการส่งต่อให้ rescue team)
+      if (![EmergencyStatus.PENDING, EmergencyStatus.ASSIGNED, EmergencyStatus.IN_PROGRESS].includes(emergency.status)) {
+        this.logger.warn(`Emergency case ${caseId} is not in a valid status for assignment (current: ${emergency.status})`);
+        throw new BadRequestException(`Emergency case can only be assigned if it is in PENDING, ASSIGNED, or IN_PROGRESS status. Current status: ${emergency.status}`);
       }
 
       const organization = await this.prisma.organization.findUnique({

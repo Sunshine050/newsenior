@@ -67,14 +67,40 @@ export const fetchHospitals = async (): Promise<Array<{ id: string; name: string
 /** Assign a case to a hospital (used by 1669 dashboard) */
 export const assignCase = async (caseId: string, hospitalId: string): Promise<any> => {
   const headers = getAuthHeaders();
+  console.log("Assigning case:", caseId, "to hospital:", hospitalId);
+  
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/sos/${caseId}/assign`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify({ hospitalId }),
   });
+  
   if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Failed to assign case: ${response.statusText} - ${err}`);
+    let errorMessage = `ไม่สามารถมอบหมายเคสได้`;
+    try {
+      const errorData = await response.json();
+      console.error("Assignment error response:", errorData);
+      // แปลง error message ให้เข้าใจง่ายขึ้น
+      if (errorData.message) {
+        if (errorData.message.includes("Only PENDING") || errorData.message.includes("Only PENDING or ASSIGNED")) {
+          errorMessage = "เคสนี้ไม่ได้อยู่ในสถานะ 'รอการดำเนินการ' หรือ 'มอบหมายแล้ว' ไม่สามารถมอบหมายได้ กรุณารีเฟรชหน้าเว็บ";
+        } else if (errorData.message.includes("already been assigned")) {
+          errorMessage = "เคสนี้ถูกมอบหมายให้โรงพยาบาลนี้แล้ว";
+        } else if (errorData.message.includes("No available beds")) {
+          errorMessage = "โรงพยาบาลที่เลือกไม่มีเตียงว่าง";
+        } else {
+          errorMessage = errorData.message;
+        }
+      }
+    } catch (parseError) {
+      // ถ้า parse JSON ไม่ได้ ให้ใช้ข้อความ default
+      const errText = await response.text();
+      console.error("Failed to parse error response:", errText);
+      if (errText) {
+        errorMessage = errText;
+      }
+    }
+    throw new Error(errorMessage);
   }
   return response.json();
 };
@@ -164,10 +190,36 @@ export const getEmergencyRequestById = async (id: string): Promise<EmergencyCase
   return normalizeCaseData(data);
 };
 
-/** Transfer a case to a rescue team (Hospital only updates case status, not team status) */
+/** Transfer a case to a rescue team (Hospital assigns case to rescue team) */
 export const transferCase = async (caseId: string, teamId: string, teamName: string): Promise<void> => {
   const headers = getAuthHeaders();
-  const caseRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/sos/${caseId}/status`, {
+  // ใช้ endpoint assign-case เพื่อสร้าง emergencyResponse สำหรับ rescue team
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/dashboard/assign-case`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify({
+      caseId: caseId,
+      assignedToId: teamId,
+    }),
+  });
+  if (!response.ok) {
+    let errorMessage = `ไม่สามารถมอบหมายเคสให้ทีมกู้ภัยได้`;
+    try {
+      const errorData = await response.json();
+      if (errorData.message) {
+        errorMessage = errorData.message;
+      }
+    } catch {
+      const errText = await response.text();
+      if (errText) {
+        errorMessage = errText;
+      }
+    }
+    throw new Error(errorMessage);
+  }
+  
+  // อัปเดต status เป็น IN_PROGRESS หลังจาก assign สำเร็จ
+  const statusRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/sos/${caseId}/status`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify({
@@ -175,9 +227,9 @@ export const transferCase = async (caseId: string, teamId: string, teamName: str
       notes: `Transferred to rescue team: ${teamName}`,
     }),
   });
-  if (!caseRes.ok) {
-    const err = await caseRes.text();
-    throw new Error(`Failed to transfer case: ${caseRes.statusText} - ${err}`);
+  if (!statusRes.ok) {
+    // ถ้า update status ล้มเหลว แต่ assign สำเร็จแล้ว ก็ไม่ต้อง throw error
+    console.warn("Failed to update case status to IN_PROGRESS, but case was assigned successfully");
   }
 };
 

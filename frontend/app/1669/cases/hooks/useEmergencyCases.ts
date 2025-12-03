@@ -99,6 +99,29 @@ export const useEmergencyCases = () => {
 
   const handleAssignCase = async (caseId: string, hospitalId: string) => {
     try {
+      // Refresh ข้อมูลก่อนมอบหมายเพื่อให้แน่ใจว่าได้ข้อมูลล่าสุด
+      const refreshedCases = await fetchActiveEmergencies();
+      const refreshedCase = refreshedCases.find(c => c.id === caseId);
+      
+      console.log("Refreshed case status:", refreshedCase?.status, "Case ID:", caseId);
+      
+      if (!refreshedCase) {
+        throw new Error("ไม่พบเคสนี้ในระบบ กรุณารีเฟรชหน้าเว็บ");
+      }
+      
+      if (refreshedCase.status !== "pending") {
+        const statusText = refreshedCase.status === "assigned" ? "มอบหมายแล้ว" 
+          : refreshedCase.status === "in-progress" ? "กำลังดำเนินการ" 
+          : refreshedCase.status === "completed" ? "เสร็จสิ้น" 
+          : refreshedCase.status === "cancelled" ? "ยกเลิก" 
+          : refreshedCase.status;
+        throw new Error(`เคสนี้อยู่ในสถานะ "${statusText}" ไม่สามารถมอบหมายได้ กรุณารีเฟรชหน้าเว็บ`);
+      }
+
+      // อัปเดต state ด้วยข้อมูลล่าสุด
+      setCases(refreshedCases);
+
+      console.log("Attempting to assign case:", caseId, "to hospital:", hospitalId);
       const result = await assignCase(caseId, hospitalId);
       
       // แสดงข้อความที่มีรายละเอียดการอัปเดตเตียง
@@ -111,10 +134,19 @@ export const useEmergencyCases = () => {
         title: "มอบหมายเคสสำเร็จ", 
         description: `เคส ${caseId.slice(-8)} ถูกมอบหมายแล้ว${bedMessage ? '\n' + bedMessage : ''}` 
       });
-      fetchData();
+      
+      // Refresh ข้อมูลทันทีหลังจากมอบหมายสำเร็จ
+      await fetchData();
     } catch (error: any) {
       console.error("เกิดข้อผิดพลาดขณะมอบหมายเคส:", error);
-      toast({ title: "ข้อผิดพลาด", description: `ไม่สามารถมอบหมายเคสได้: ${error.message}`, variant: "destructive" });
+      // แปลง error message ให้เข้าใจง่ายขึ้น
+      let errorMessage = error.message || "ไม่สามารถมอบหมายเคสได้";
+      if (errorMessage.includes("Only PENDING cases can be assigned") || errorMessage.includes("ไม่ได้อยู่ในสถานะ")) {
+        errorMessage = "เคสนี้ไม่ได้อยู่ในสถานะ 'รอการดำเนินการ' ไม่สามารถมอบหมายได้ กรุณารีเฟรชหน้าเว็บ";
+      }
+      toast({ title: "ข้อผิดพลาด", description: errorMessage, variant: "destructive" });
+      // Re-throw error เพื่อให้ component รู้ว่าล้มเหลว
+      throw error;
     }
   };
 

@@ -29,6 +29,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
+        include: {
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+            },
+          },
+        },
       });
 
       if (!user) {
@@ -40,8 +49,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         throw new UnauthorizedException("User is inactive");
       }
 
-      console.log('JwtStrategy - Validation successful for user:', user);
-      return user;
+      // Ensure organizationId is available on user object
+      const userWithOrg = {
+        ...user,
+        organizationId: user.organizationId || user.organization?.id,
+      };
+
+      console.log('JwtStrategy - Validation successful for user:', userWithOrg);
+      return userWithOrg;
     } catch (error) {
       console.error('JwtStrategy - Error during validation:', error.message);
       throw new UnauthorizedException("Validation failed: " + error.message);

@@ -211,20 +211,82 @@ export const useHospitalDashboard = () => {
         },
       });
 
-      // Fetch rescue teams
-      try {
-        const teamsResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/rescue-teams`,
-          { headers }
-        );
+      // Fetch rescue teams - both active teams working with hospital and available teams
+      if (hospitalId && hospitalId !== "mock-hospital-1") {
+        try {
+          // First, try to get active teams working with this hospital
+          const activeTeamsResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/hospitals/${hospitalId}/active-rescue-teams`,
+            { headers }
+          );
 
-        if (teamsResponse.ok) {
-          const teamsData = await teamsResponse.json();
-          setRescueTeams(teamsData);
+          let activeTeams: any[] = [];
+          if (activeTeamsResponse.ok) {
+            activeTeams = await activeTeamsResponse.json();
+          }
+
+          // Also fetch all available/online rescue teams
+          const allTeamsResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/rescue-teams`,
+            { headers }
+          );
+
+          let allTeams: any[] = [];
+          if (allTeamsResponse.ok) {
+            allTeams = await allTeamsResponse.json();
+          }
+
+          // Combine: prioritize active teams, then add available teams that aren't already in the list
+          const activeTeamIds = new Set(activeTeams.map((t: any) => t.id));
+          const availableTeams = allTeams.filter((team: any) => 
+            (team.status === "AVAILABLE" || team.status === "ACTIVE") && 
+            !activeTeamIds.has(team.id)
+          );
+
+          // Map active teams
+          const mappedActiveTeams = activeTeams.map((team: any) => ({
+            id: team.id,
+            name: team.name,
+            status: team.status || "ACTIVE",
+            address: team.address,
+            city: team.city,
+            vehicleTypes: team.vehicleTypes || [],
+            linkedCasesCount: team.linkedCasesCount || 0,
+          }));
+
+          // Map available teams
+          const mappedAvailableTeams = availableTeams.map((team: any) => ({
+            id: team.id,
+            name: team.name,
+            status: team.status || "AVAILABLE",
+            address: team.address,
+            city: team.city,
+            vehicleTypes: team.vehicleTypes || [],
+            linkedCasesCount: 0,
+          }));
+
+          // Combine both lists
+          setRescueTeams([...mappedActiveTeams, ...mappedAvailableTeams]);
+        } catch (err) {
+          console.error("Error fetching rescue teams:", err);
+          // Fallback to all rescue teams if specific endpoint fails
+          try {
+            const teamsResponse = await fetch(
+              `${process.env.NEXT_PUBLIC_API_URL}/rescue-teams`,
+              { headers }
+            );
+            if (teamsResponse.ok) {
+              const teamsData = await teamsResponse.json();
+              // Filter to show only available/active teams
+              const availableTeams = teamsData.filter((team: any) => 
+                team.status === "AVAILABLE" || team.status === "ACTIVE"
+              );
+              setRescueTeams(availableTeams);
+            }
+          } catch (fallbackErr) {
+            console.error("Error fetching rescue teams (fallback):", fallbackErr);
+          }
         }
-      } catch (err) {
-        console.error("Error fetching rescue teams:", err);
-        // Don't fail the whole dashboard if rescue teams fail
       }
 
     } catch (err: any) {

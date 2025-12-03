@@ -6,6 +6,7 @@ import {
   fetchActiveEmergencies,
   transferCase,
 } from "@/shared/services/emergencyService";
+import { webSocketClient } from "@lib/websocket";
 
 export interface MapLocation {
   id: string;
@@ -51,6 +52,42 @@ export const useHospitalCases = () => {
     };
 
     loadCases();
+
+    // เชื่อมต่อ WebSocket เพื่อรับการอัปเดตแบบ real-time
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      webSocketClient.connect(token);
+      
+      // Listen สำหรับ status updates (เมื่อเคสถูก assign หรืออัปเดต)
+      webSocketClient.onStatusUpdate((data) => {
+        console.log("ได้รับการอัปเดตสถานะเคส:", data);
+        // Refresh ข้อมูลเมื่อมีการอัปเดตสถานะ
+        loadCases();
+      });
+
+      // Listen สำหรับ notifications (เมื่อมีเคสใหม่ถูก assign ให้โรงพยาบาล)
+      webSocketClient.on("notification", (data) => {
+        console.log("ได้รับการแจ้งเตือน:", data);
+        // ถ้าเป็น notification เกี่ยวกับการ assign ให้ refresh
+        if (data.type === "ASSIGNMENT" || data.metadata?.status === "ASSIGNED") {
+          loadCases();
+          toast({
+            title: data.title || "เคสใหม่",
+            description: data.body || "มีเคสใหม่ที่ถูกมอบหมายให้คุณ",
+          });
+        }
+      });
+
+      // Listen สำหรับ emergency updates
+      webSocketClient.onEmergency((data) => {
+        console.log("ได้รับเคสฉุกเฉินใหม่:", data);
+        loadCases();
+      });
+    }
+
+    return () => {
+      webSocketClient.disconnect();
+    };
   }, [toast]);
 
   const filteredCases = useMemo(() => {

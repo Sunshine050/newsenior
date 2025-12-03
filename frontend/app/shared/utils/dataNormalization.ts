@@ -26,6 +26,10 @@ export const normalizeCaseData = (item: any): EmergencyCase => {
     "IN_PROGRESS": "in-progress",
     "COMPLETED": "completed",
     "CANCELLED": "cancelled",
+    // Handle invalid status values
+    "Active": "pending",
+    "ACTIVE": "pending",
+    "active": "pending",
     // Also support lowercase versions
     "pending": "pending",
     "assigned": "assigned",
@@ -36,7 +40,12 @@ export const normalizeCaseData = (item: any): EmergencyCase => {
   };
   
   const rawStatus = item.status || "PENDING";
-  const normalizedStatus = statusMap[rawStatus] || statusMap[rawStatus.toUpperCase()] || "pending";
+  let normalizedStatus = statusMap[rawStatus] || statusMap[rawStatus.toUpperCase()] || "pending";
+  
+  // ถ้ามี response (assignedTo) แต่ status ยังเป็น pending ให้เปลี่ยนเป็น assigned
+  if (normalizedStatus === "pending" && (item.assignedTo || item.responses?.[0]?.organization?.name)) {
+    normalizedStatus = "assigned";
+  }
   let severity = Number(item.medicalInfo?.severity) || gradeToSeverity[item.grade] || 1;
   let grade = (item.medicalInfo?.grade || item.grade || "NON_URGENT").toUpperCase();
   if (grade === "UNKNOWN" || !grade || grade === "") {
@@ -63,11 +72,19 @@ export const normalizeCaseData = (item: any): EmergencyCase => {
     };
   }
 
+  // ตรวจสอบว่ามี response หรือไม่ เพื่อกำหนด assignedTo และ status
+  const assignedTo = item.assignedTo || item.responses?.[0]?.organization?.name || undefined;
+  
+  // ถ้ามี assignedTo แต่ status ยังเป็น pending ให้เปลี่ยนเป็น assigned
+  const finalStatus = (normalizedStatus === "pending" && assignedTo) 
+    ? "assigned" 
+    : normalizedStatus;
+  
   return {
     id: item.id || "unknown-id",
     description: (item.description || "ไม่มีรายละเอียด").slice(0, 50) + "...",
     descriptionFull: item.description || "ไม่มีรายละเอียด",
-    status: status as EmergencyCase["status"],
+    status: finalStatus as EmergencyCase["status"],
     severity: validSeverity as 1 | 2 | 3 | 4,
     grade: validGrade as "CRITICAL" | "URGENT" | "NON_URGENT",
     reportedAt: item.reportedAt || item.createdAt || new Date().toISOString(),
@@ -75,7 +92,7 @@ export const normalizeCaseData = (item: any): EmergencyCase => {
     contactNumber: item.contactNumber || item.patient?.phone || "N/A",
     emergencyType: item.emergencyType || typeTranslations[item.type] || typeTranslations["OTHER"],
     location,
-    assignedTo: item.assignedTo || item.responses?.[0]?.organization?.name || undefined,
+    assignedTo: assignedTo,
     symptoms,
   };
 };

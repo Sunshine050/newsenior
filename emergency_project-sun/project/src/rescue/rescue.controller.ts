@@ -39,7 +39,7 @@ export class RescueController {
   }
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.EMERGENCY_CENTER, UserRole.HOSPITAL)
+  @Roles(UserRole.ADMIN, UserRole.EMERGENCY_CENTER, UserRole.HOSPITAL, UserRole.RESCUE_TEAM)
   @ApiOperation({ summary: 'Get all rescue teams', description: 'Get list of all rescue teams with optional search' })
   @ApiQuery({ name: 'search', required: false, description: 'Search query for rescue team name or location' })
   @ApiResponse({ status: 200, description: 'Rescue teams retrieved successfully' })

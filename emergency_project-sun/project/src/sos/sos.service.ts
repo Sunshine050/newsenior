@@ -88,8 +88,31 @@ export class SosService {
       });
 
       if (!emergency) throw new NotFoundException("Emergency request not found");
-      if (emergency.status !== EmergencyStatus.PENDING)
-        throw new BadRequestException("Only PENDING cases can be assigned");
+      
+      // ตรวจสอบว่าเคสนี้มี response สำหรับ hospital นี้อยู่แล้วหรือไม่
+      const existingResponse = emergency.responses.find(r => r.organizationId === hospitalId);
+      if (existingResponse) {
+        throw new BadRequestException("This case has already been assigned to this hospital");
+      }
+      
+      // Normalize status - handle case where status might be "Active" or other invalid values
+      let normalizedStatus = emergency.status;
+      if (normalizedStatus === "Active" || normalizedStatus === "ACTIVE") {
+        normalizedStatus = EmergencyStatus.PENDING;
+      }
+      
+      // อนุญาตให้ assign case ที่มี status เป็น PENDING หรือ ASSIGNED (ถ้ายังไม่มี response สำหรับ hospital นี้)
+      if (normalizedStatus !== EmergencyStatus.PENDING && normalizedStatus !== EmergencyStatus.ASSIGNED) {
+        throw new BadRequestException(`Only PENDING or ASSIGNED cases can be assigned. Current status: ${emergency.status}`);
+      }
+      
+      // ถ้า status ไม่ถูกต้อง ให้อัปเดตเป็น PENDING
+      if (emergency.status !== normalizedStatus) {
+        await prisma.emergencyRequest.update({
+          where: { id: emergencyId },
+          data: { status: normalizedStatus },
+        });
+      }
 
       // ตรวจสอบ hospital
       const hospital = await prisma.organization.findUnique({ 

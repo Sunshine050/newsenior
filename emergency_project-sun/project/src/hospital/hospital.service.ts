@@ -396,6 +396,80 @@ export class HospitalService {
     }
   }
 
+  async getActiveRescueTeamsForHospital(hospitalId: string) {
+    this.logger.log(`Fetching active rescue teams for hospital: ${hospitalId}`);
+    
+    try {
+      // ดึง emergency responses ที่เกี่ยวข้องกับ hospital นี้
+      const emergencyResponses = await this.prisma.emergencyResponse.findMany({
+        where: {
+          organizationId: hospitalId,
+          status: {
+            in: ["ASSIGNED", "IN_PROGRESS"],
+          },
+        },
+        include: {
+          emergencyRequest: {
+            include: {
+              responses: {
+                where: {
+                  organization: {
+                    type: "RESCUE_TEAM",
+                  },
+                },
+                include: {
+                  organization: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // รวบรวม rescue teams ที่ทำงานกับ emergency cases ของ hospital นี้
+      const rescueTeamMap = new Map();
+      
+      emergencyResponses.forEach((response) => {
+        response.emergencyRequest.responses.forEach((rescueResponse) => {
+          if (rescueResponse.organization) {
+            const teamId = rescueResponse.organization.id;
+            if (!rescueTeamMap.has(teamId)) {
+              rescueTeamMap.set(teamId, {
+                ...rescueResponse.organization,
+                linkedCases: [],
+                status: rescueResponse.status,
+              });
+            }
+            const team = rescueTeamMap.get(teamId);
+            team.linkedCases.push({
+              emergencyId: response.emergencyRequest.id,
+              responseId: rescueResponse.id,
+              status: rescueResponse.status,
+            });
+          }
+        });
+      });
+
+      // แปลง Map เป็น Array และเพิ่มข้อมูลเพิ่มเติม
+      const teams = Array.from(rescueTeamMap.values()).map((team) => ({
+        id: team.id,
+        name: team.name,
+        status: team.status || team.status || "ACTIVE",
+        address: team.address,
+        city: team.city,
+        vehicleTypes: team.vehicleTypes || [],
+        linkedCases: team.linkedCases,
+        linkedCasesCount: team.linkedCases.length,
+      }));
+
+      this.logger.log(`Found ${teams.length} active rescue teams for hospital ${hospitalId}`);
+      return teams;
+    } catch (error) {
+      this.logger.error(`Failed to fetch active rescue teams: ${error?.message ?? error}`, error?.stack);
+      throw new BadRequestException(`Cannot fetch active rescue teams: ${error?.message ?? 'Internal error'}`);
+    }
+  }
+
   async updateEmergencyResponseStatusManual(responseId: string, status: string) {
     this.logger.log(`Fetching emergency response with ID: ${responseId} to update status to ${status}`);
     const emergencyResponse = await this.prisma.emergencyResponse.findUnique({

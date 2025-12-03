@@ -97,7 +97,7 @@ export interface ApiRescueTeam {
   longitude?: number;
   contactPhone: string;
   contactEmail?: string;
-  status: "AVAILABLE" | "BUSY" | "OFF_DUTY" | "MAINTENANCE" | "ACTIVE" | "INACTIVE";
+  status: "AVAILABLE" | "BUSY" | "OFF_DUTY" | "MAINTENANCE" | "ACTIVE" | "INACTIVE" | "IN_PROGRESS" | "ASSIGNED";
   vehicleTypes?: string[];
   createdAt: string;
   updatedAt: string;
@@ -106,6 +106,7 @@ export interface ApiRescueTeam {
     notes?: string;
     [key: string]: any;
   };
+  linkedCasesCount?: number;
 }
 
 export interface RescueTeam {

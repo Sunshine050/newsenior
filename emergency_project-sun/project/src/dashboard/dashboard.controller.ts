@@ -49,6 +49,7 @@ export class DashboardController {
   }
 
   @Post('assign-case')
+  @Roles(UserRole.ADMIN, UserRole.EMERGENCY_CENTER, UserRole.HOSPITAL)
   @ApiOperation({ summary: 'Assign emergency case', description: 'Assign an emergency case to a rescue team or hospital' })
   @ApiBody({ type: AssignCaseDto })
   @ApiResponse({ status: 201, description: 'Case assigned successfully' })

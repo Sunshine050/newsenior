@@ -245,6 +245,16 @@ export class HospitalController {
     return this.hospitalService.getStats(hospitalId, period, startDate, endDate);
   }
 
+  @Get(":id/active-rescue-teams")
+  @Roles(UserRole.HOSPITAL, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get active rescue teams for hospital', description: 'Get rescue teams that are currently working on emergency cases assigned to this hospital' })
+  @ApiParam({ name: 'id', description: 'Hospital ID' })
+  @ApiResponse({ status: 200, description: 'Active rescue teams retrieved successfully' })
+  async getActiveRescueTeams(@Param("id") hospitalId: string) {
+    this.logger.log(`GET /hospitals/${hospitalId}/active-rescue-teams called`);
+    return this.hospitalService.getActiveRescueTeamsForHospital(hospitalId);
+  }
+
   @Get(":id/metrics")
   @Roles(UserRole.HOSPITAL, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get hospital metrics', description: 'Retrieve specific metric data for a hospital' })

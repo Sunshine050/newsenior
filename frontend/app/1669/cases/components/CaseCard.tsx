@@ -45,13 +45,28 @@ export const CaseCard: React.FC<CaseCardProps> = ({
       toast({ title: "ข้อผิดพลาด", description: "กรุณาเลือกโรงพยาบาล", variant: "destructive" });
       return;
     }
+    // เช็ค status ก่อนมอบหมาย
+    if (status !== "pending") {
+      toast({ 
+        title: "ไม่สามารถมอบหมายได้", 
+        description: `เคสนี้อยู่ในสถานะ "${status === "assigned" ? "มอบหมายแล้ว" : status === "in-progress" ? "กำลังดำเนินการ" : status === "completed" ? "เสร็จสิ้น" : status === "cancelled" ? "ยกเลิก" : status}" ไม่สามารถมอบหมายได้`, 
+        variant: "destructive" 
+      });
+      return;
+    }
     try {
+      // เรียก onAssign และรอให้เสร็จก่อนแสดง toast
       await onAssign(id, selectedHospital);
-      toast({ title: "มอบหมายเคสสำเร็จ", description: `เคส ${id.slice(-8)} ถูกมอบหมายให้ ${hospitals.find(h => h.id === selectedHospital)?.name}` });
+      // ไม่ต้องแสดง toast ที่นี่ เพราะ onAssign จะจัดการเอง
       setSelectedHospital("");
     } catch (error: any) {
       console.error("เกิดข้อผิดพลาดขณะมอบหมายเคส:", error);
-      toast({ title: "ข้อผิดพลาด", description: `ไม่สามารถมอบหมายเคสได้: ${error.message}`, variant: "destructive" });
+      // แปลง error message ให้เข้าใจง่ายขึ้น
+      let errorMessage = error.message || "ไม่สามารถมอบหมายเคสได้";
+      if (errorMessage.includes("Only PENDING cases can be assigned") || errorMessage.includes("ไม่ได้อยู่ในสถานะ")) {
+        errorMessage = "เคสนี้ไม่ได้อยู่ในสถานะ 'รอการดำเนินการ' ไม่สามารถมอบหมายได้ กรุณารีเฟรชหน้าเว็บ";
+      }
+      toast({ title: "ข้อผิดพลาด", description: errorMessage, variant: "destructive" });
     }
   };
 
@@ -114,7 +129,7 @@ export const CaseCard: React.FC<CaseCardProps> = ({
         {assignedTo && (
           <p className="text-sm text-slate-600 dark:text-slate-400"><span className="font-medium">มอบหมายให้:</span> {assignedTo}</p>
         )}
-        {!assignedTo && status !== "completed" && status !== "cancelled" && (
+        {!assignedTo && status === "pending" && status !== "completed" && status !== "cancelled" && (
           <div className="flex gap-2 items-center">
             <Select value={selectedHospital} onValueChange={setSelectedHospital}>
               <SelectTrigger className="w-[200px]">

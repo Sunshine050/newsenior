@@ -13,25 +13,22 @@ export const useOrganizationSettings = (role: "hospital" | "rescue_team") => {
     configureApiClient();
     try {
       // 1. Get User Profile to find Organization ID
-      // We assume the user profile has hospitalId or rescueTeamId
-      // If not, we might need to search or use a different endpoint
+      // User profile has organizationId field that links to the organization
       const user = await UsersService.userControllerGetProfile();
       
       if (role === "hospital") {
-        if (user.hospitalId) {
-          const hospital = await HospitalsService.hospitalControllerFindOne(user.hospitalId);
+        if (user.organizationId) {
+          const hospital = await HospitalsService.hospitalControllerFindOne(user.organizationId);
           setOrganization(hospital);
         } else {
-            // Fallback: Try to find hospital by user ID if the relationship is inverted or not directly on user
-            // Or maybe the user IS the hospital (unlikely for staff)
-            console.warn("No hospitalId found on user profile");
+            console.warn("No organizationId found on user profile");
         }
       } else if (role === "rescue_team") {
-        if (user.rescueTeamId) {
-          const team = await RescueTeamsService.rescueControllerFindOne(user.rescueTeamId);
+        if (user.organizationId) {
+          const team = await RescueTeamsService.rescueControllerFindOne(user.organizationId);
           setOrganization(team);
         } else {
-             console.warn("No rescueTeamId found on user profile");
+             console.warn("No organizationId found on user profile");
         }
       }
     } catch (error) {

@@ -1,11 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import React from "react";
 import { useSettings } from "@/shared/hooks/useSettings";
 import { useOrganizationSettings } from "@/shared/hooks/useOrganizationSettings";
 import { useAuth } from "@/shared/hooks/useAuth";
 import DashboardLayout from "@components/dashboard/dashboard-layout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@components/ui/tabs";
 import { FormProvider } from "react-hook-form";
 import { SettingsForm } from "@/1669/settings/components/SettingsForm";
@@ -13,7 +20,13 @@ import { Loader2, Ambulance, Activity, User, Bell } from "lucide-react";
 import { Button } from "@components/ui/button";
 import { Input } from "@components/ui/input";
 import { Label } from "@components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@components/ui/select";
 
 export default function RescueSettingsPage() {
   useAuth();
@@ -40,24 +53,34 @@ export default function RescueSettingsPage() {
 
   // Local state
   const [teamName, setTeamName] = useState(team?.name || "");
-  const [baseLocation, setBaseLocation] = useState(team?.baseLocation || "");
-  const [vehicleType, setVehicleType] = useState(team?.vehicleType || "");
+  const [address, setAddress] = useState(team?.address || "");
+  const [city, setCity] = useState(team?.city || "");
+  const [vehicleTypes, setVehicleTypes] = useState(
+    team?.vehicleTypes?.join(", ") || ""
+  );
   const [status, setStatus] = useState(team?.status || "AVAILABLE");
 
   // Update local state when team data loads
-  if (team && teamName === "" && !isOrgLoading) {
+  React.useEffect(() => {
+    if (team && !isOrgLoading) {
       setTeamName(team.name || "");
-      setBaseLocation(team.baseLocation || "");
-      setVehicleType(team.vehicleType || "");
+      setAddress(team.address || "");
+      setCity(team.city || "");
+      setVehicleTypes(team.vehicleTypes?.join(", ") || "");
       setStatus(team.status || "AVAILABLE");
-  }
+    }
+  }, [team, isOrgLoading]);
 
   const handleUpdateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     await updateOrganization({
-        name: teamName,
-        baseLocation: baseLocation,
-        vehicleType: vehicleType
+      name: teamName,
+      address: address,
+      city: city,
+      vehicleTypes: vehicleTypes
+        .split(",")
+        .map((v: string) => v.trim())
+        .filter((v: string) => v.length > 0),
     });
   };
 
@@ -93,13 +116,19 @@ export default function RescueSettingsPage() {
     >
       <div className="container mx-auto p-6 space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">ตั้งค่าหน่วยกู้ภัย</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            ตั้งค่าหน่วยกู้ภัย
+          </h1>
           <p className="text-slate-500 dark:text-slate-400">
             จัดการข้อมูลทีม สถานะ และการตั้งค่าส่วนตัว
           </p>
         </div>
 
-        <Tabs defaultValue="team-info" className="space-y-4" onValueChange={setActiveTab}>
+        <Tabs
+          defaultValue="team-info"
+          className="space-y-4"
+          onValueChange={setActiveTab}
+        >
           <TabsList>
             <TabsTrigger value="team-info" className="flex items-center gap-2">
               <Ambulance className="h-4 w-4" />
@@ -113,7 +142,10 @@ export default function RescueSettingsPage() {
               <User className="h-4 w-4" />
               โปรไฟล์ส่วนตัว
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <TabsTrigger
+              value="notifications"
+              className="flex items-center gap-2"
+            >
               <Bell className="h-4 w-4" />
               การแจ้งเตือน
             </TabsTrigger>
@@ -129,15 +161,38 @@ export default function RescueSettingsPage() {
                 <form onSubmit={handleUpdateTeam} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">ชื่อทีม</Label>
-                    <Input id="name" value={teamName} onChange={(e) => setTeamName(e.target.value)} />
+                    <Input
+                      id="name"
+                      value={teamName}
+                      onChange={(e) => setTeamName(e.target.value)}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="baseLocation">สถานที่ตั้งฐาน</Label>
-                    <Input id="baseLocation" value={baseLocation} onChange={(e) => setBaseLocation(e.target.value)} />
+                    <Label htmlFor="address">ที่อยู่</Label>
+                    <Input
+                      id="address"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="vehicleType">ประเภทรถ</Label>
-                    <Input id="vehicleType" value={vehicleType} onChange={(e) => setVehicleType(e.target.value)} />
+                    <Label htmlFor="city">เมือง</Label>
+                    <Input
+                      id="city"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="vehicleTypes">
+                      ประเภทรถ (คั่นด้วยเครื่องหมายจุลภาค)
+                    </Label>
+                    <Input
+                      id="vehicleTypes"
+                      value={vehicleTypes}
+                      onChange={(e) => setVehicleTypes(e.target.value)}
+                      placeholder="เช่น: Ambulance, Fire Truck"
+                    />
                   </div>
                   <Button type="submit">บันทึกข้อมูล</Button>
                 </form>
@@ -160,9 +215,13 @@ export default function RescueSettingsPage() {
                         <SelectValue placeholder="เลือกสถานะ" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="AVAILABLE">ว่าง (Available)</SelectItem>
+                        <SelectItem value="AVAILABLE">
+                          ว่าง (Available)
+                        </SelectItem>
                         <SelectItem value="BUSY">ไม่ว่าง (Busy)</SelectItem>
-                        <SelectItem value="OFFLINE">ออฟไลน์ (Offline)</SelectItem>
+                        <SelectItem value="OFFLINE">
+                          ออฟไลน์ (Offline)
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -193,7 +252,10 @@ export default function RescueSettingsPage() {
               </CardHeader>
               <CardContent>
                 <FormProvider {...notificationForm}>
-                  <SettingsForm category="notification" onSubmit={onSubmitNotification} />
+                  <SettingsForm
+                    category="notification"
+                    onSubmit={onSubmitNotification}
+                  />
                 </FormProvider>
               </CardContent>
             </Card>
